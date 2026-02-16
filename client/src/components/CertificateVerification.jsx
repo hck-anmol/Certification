@@ -2,9 +2,9 @@ import { useState } from "react";
 
 const NavIcon = () => (
   <svg width="50" height="50" viewBox="0 0 50 50" fill="none">
-    <path d="M25 7 C16 7 9 16 9 24 C9 35 25 45 25 45 C25 45 41 35 41 24 C41 16 34 7 25 7Z" fill="#c0185a" opacity="0.85"/>
-    <path d="M17 23 C17 23 21 30 25 30 C29 30 33 23 33 23" stroke="white" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-    <circle cx="25" cy="17" r="4" fill="white"/>
+    <path d="M25 7 C16 7 9 16 9 24 C9 35 25 45 25 45 C25 45 41 35 41 24 C41 16 34 7 25 7Z" fill="#c0185a" opacity="0.85" />
+    <path d="M17 23 C17 23 21 30 25 30 C29 30 33 23 33 23" stroke="white" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+    <circle cx="25" cy="17" r="4" fill="white" />
   </svg>
 );
 
@@ -46,18 +46,42 @@ const CertificateVerification = () => {
     setError("");
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     if (!form.name.trim() || !form.regId.trim() || !form.dob) {
       setError("Please fill in all mandatory fields before proceeding.");
       return;
     }
     setLoading(true);
-    // TODO: Replace with your actual API call
-    // const res = await fetch('/api/verify-certificate', { method: 'POST', body: JSON.stringify(form) });
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/generate-certificate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: form.name, regId: form.regId, dob: form.dob })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        setError(errorData.message || 'Verification failed. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'certificate.pdf';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
       setLoading(false);
       setSuccess(true);
-    }, 2000);
+    } catch (err) {
+      setError(err.message || 'An error occurred. Please try again.');
+      setLoading(false);
+    }
   };
 
   return (
@@ -149,7 +173,10 @@ const CertificateVerification = () => {
                   )}
 
                   <button
-                    onClick={handleVerify}
+                    onClick={() => {
+                      console.log(form.name, form.regId, form.dob);
+                      handleVerify();
+                    }}
                     disabled={loading}
                     style={{ width: "100%", padding: "13px", background: loading ? "#7faee8" : "linear-gradient(135deg,#1a6fc4,#1254a0)", color: "white", border: "none", borderRadius: "6px", fontSize: "15px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer", marginBottom: "11px", letterSpacing: "0.3px" }}
                   >
@@ -175,8 +202,8 @@ const CertificateVerification = () => {
             </div>
 
             <div style={{ background: "white", borderRadius: "0 0 8px 8px", padding: "26px", boxShadow: "0 4px 18px rgba(0,0,0,0.08)" }}>
-              <Field label="Email Address" icon="✉️" type="email" placeholder="Enter registered email" value="" onChange={() => {}} required />
-              <Field label="Password" icon="🔒" type="password" placeholder="Enter your password" value="" onChange={() => {}} required />
+              <Field label="Email Address" icon="✉️" type="email" placeholder="Enter registered email" value="" onChange={() => { }} required />
+              <Field label="Password" icon="🔒" type="password" placeholder="Enter your password" value="" onChange={() => { }} required />
 
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "18px" }}>
                 <input type="checkbox" id="rem" style={{ cursor: "pointer", accentColor: "#1a6fc4" }} />
