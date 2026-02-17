@@ -15,24 +15,38 @@ const formatDate = (dateString) => {
 
 // Helper function to get student data
 const getStudentData = async (regId, dob) => {
-  const [rows] = await pool.execute(
-    "SELECT * FROM students WHERE registration_number = ? AND dob = ?",
-    [regId, dob]
-  );
-  return rows.length > 0 ? rows[0] : null;
+  try {
+    console.log(`Querying database for registration_number='${regId}' and dob='${dob}'`);
+    const [rows] = await pool.execute(
+      "SELECT * FROM students WHERE registration_number = ? AND dob = ?",
+      [regId, dob]
+    );
+    console.log(`Query returned ${rows.length} rows`);
+    return rows.length > 0 ? rows[0] : null;
+  } catch (error) {
+    console.error('Database query error in getStudentData:', error);
+    throw error;
+  }
 };
 
 router.post('/generate-certificate', async (req, res) => {
   try {
     const { name, regId, dob } = req.body;
 
+    console.log('Certificate generation request:', { name, regId, dob });
+
     if (!name || !regId || !dob) {
       return res.status(400).json({ message: "Name, Registration ID, and Date of Birth are required" });
     }
 
+    console.log('Fetching student data for:', { regId, dob });
     const student = await getStudentData(regId, dob);
+    console.log('Student data found:', student ? 'Yes' : 'No');
 
     if (!student) {
+      console.log('Student not found in database. Available students:');
+      const [allStudents] = await pool.execute("SELECT registration_number, name, dob FROM students");
+      console.log(allStudents);
       return res.status(404).json({ message: "Student not found. Please verify your credentials." });
     }
 
@@ -164,8 +178,9 @@ router.post('/generate-certificate', async (req, res) => {
     res.send(pdfBytes);
 
   } catch (err) {
-    console.error('Certificate generation error:', err);
-    res.status(500).json({ message: "Server Error: Failed to generate certificate" });
+    console.error('Certificate generation error:', err.message || err);
+    console.error('Full error details:', err);
+    res.status(500).json({ message: "Server Error: Failed to generate certificate", error: err.message });
   }
 });
 
@@ -403,8 +418,9 @@ router.post('/generate-attendance', async (req, res) => {
     res.send(pdfBytes);
 
   } catch (err) {
-    console.error('Attendance sheet generation error:', err);
-    res.status(500).json({ message: "Server Error: Failed to generate attendance sheet" });
+    console.error('Attendance sheet generation error:', err.message || err);
+    console.error('Full error details:', err);
+    res.status(500).json({ message: "Server Error: Failed to generate attendance sheet", error: err.message });
   }
 });
 
