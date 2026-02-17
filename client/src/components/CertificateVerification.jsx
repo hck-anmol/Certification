@@ -38,21 +38,40 @@ const Field = ({ label, icon, type = "text", placeholder, value, onChange, requi
 const CertificateVerification = () => {
   const [form, setForm] = useState({ name: "", regId: "", dob: "" });
   const [loading, setLoading] = useState(false);
+  const [certLoading, setCertLoading] = useState(false);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [studentData, setStudentData] = useState(null);
 
   const set = (f) => (e) => {
     setForm({ ...form, [f]: e.target.value });
     setError("");
   };
 
+  // Helper function to download PDF
+  const downloadPDF = (blob, filename) => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
+  // Verify credentials and fetch student data
   const handleVerify = async () => {
     if (!form.name.trim() || !form.regId.trim() || !form.dob) {
       setError("Please fill in all mandatory fields before proceeding.");
       return;
     }
     setLoading(true);
+    setError("");
+    
     try {
+      // First verify by trying to fetch certificate (this validates credentials)
       const res = await fetch('/api/generate-certificate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,21 +85,117 @@ const CertificateVerification = () => {
         return;
       }
 
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'certificate.pdf';
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
+      // If verification successful, set success state
+      setStudentData({
+        name: form.name,
+        regId: form.regId,
+        dob: form.dob
+      });
       setLoading(false);
       setSuccess(true);
     } catch (err) {
       setError(err.message || 'An error occurred. Please try again.');
       setLoading(false);
+    }
+  };
+
+  // Download certificate
+  const handleDownloadCertificate = async () => {
+    if (!studentData) return;
+    
+    setCertLoading(true);
+    setError("");
+    try {
+      const res = await fetch('/api/generate-certificate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          name: studentData.name, 
+          regId: studentData.regId, 
+          dob: studentData.dob 
+        })
+      });
+
+      if (!res.ok) {
+        // Check if response is JSON before parsing
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await res.json();
+          setError(errorData.message || 'Failed to generate certificate.');
+        } else {
+          // If HTML error page, get status text
+          const text = await res.text();
+          setError(`Server error (${res.status}): ${res.statusText}. Please check if the server is running and the route exists.`);
+        }
+        setCertLoading(false);
+        return;
+      }
+
+      // Check if response is actually a PDF
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/pdf')) {
+        const text = await res.text();
+        setError('Server returned unexpected content type. Expected PDF.');
+        setCertLoading(false);
+        return;
+      }
+
+      const blob = await res.blob();
+      downloadPDF(blob, `certificate_${studentData.regId}.pdf`);
+      setCertLoading(false);
+    } catch (err) {
+      setError(err.message || 'An error occurred while downloading certificate. Please check your connection.');
+      setCertLoading(false);
+    }
+  };
+
+  // Download attendance sheet
+  const handleDownloadAttendance = async () => {
+    if (!studentData) return;
+    
+    setAttendanceLoading(true);
+    setError("");
+    try {
+      const res = await fetch('/api/generate-attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          name: studentData.name, 
+          regId: studentData.regId, 
+          dob: studentData.dob 
+        })
+      });
+
+      if (!res.ok) {
+        // Check if response is JSON before parsing
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await res.json();
+          setError(errorData.message || 'Failed to generate attendance sheet.');
+        } else {
+          // If HTML error page, get status text
+          const text = await res.text();
+          setError(`Server error (${res.status}): ${res.statusText}. Please check if the server is running and the route exists.`);
+        }
+        setAttendanceLoading(false);
+        return;
+      }
+
+      // Check if response is actually a PDF
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/pdf')) {
+        const text = await res.text();
+        setError('Server returned unexpected content type. Expected PDF.');
+        setAttendanceLoading(false);
+        return;
+      }
+
+      const blob = await res.blob();
+      downloadPDF(blob, `attendance_${studentData.regId}.pdf`);
+      setAttendanceLoading(false);
+    } catch (err) {
+      setError(err.message || 'An error occurred while downloading attendance sheet. Please check your connection.');
+      setAttendanceLoading(false);
     }
   };
 
@@ -133,17 +248,69 @@ const CertificateVerification = () => {
                 <div style={{ textAlign: "center", padding: "30px 10px" }}>
                   <div style={{ fontSize: "52px", marginBottom: "14px" }}>✅</div>
                   <div style={{ fontSize: "18px", fontWeight: "700", color: "#1e8c4e", marginBottom: "8px" }}>Credentials Verified!</div>
-                  <div style={{ color: "#555", fontSize: "14px", marginBottom: "22px" }}>Your certificate is ready. Fetching data from the database...</div>
-                  <div style={{ background: "#f0faf4", border: "1px solid #b7e4c7", borderRadius: "6px", padding: "14px", textAlign: "left" }}>
+                  <div style={{ color: "#555", fontSize: "14px", marginBottom: "22px" }}>Your documents are ready. Download your certificate and attendance sheet.</div>
+                  <div style={{ background: "#f0faf4", border: "1px solid #b7e4c7", borderRadius: "6px", padding: "14px", textAlign: "left", marginBottom: "20px" }}>
                     <div style={{ fontSize: "13px", color: "#555", lineHeight: "2.1" }}>
-                      <strong>Name:</strong> {form.name}<br />
-                      <strong>Reg ID:</strong> {form.regId}<br />
-                      <strong>DOB:</strong> {form.dob}
+                      <strong>Name:</strong> {studentData?.name}<br />
+                      <strong>Reg ID:</strong> {studentData?.regId}<br />
+                      <strong>DOB:</strong> {studentData?.dob}
                     </div>
                   </div>
+
+                  {error && (
+                    <div style={{ background: "#fff0f3", border: "1px solid #ffc5d0", borderRadius: "6px", padding: "10px 14px", marginBottom: "14px", color: "#c0185a", fontSize: "13px", display: "flex", alignItems: "center", gap: "7px", justifyContent: "center" }}>
+                      ⚠️ {error}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "18px" }}>
+                    <button
+                      onClick={handleDownloadCertificate}
+                      disabled={certLoading}
+                      style={{ 
+                        width: "100%", 
+                        padding: "13px", 
+                        background: certLoading ? "#7faee8" : "linear-gradient(135deg,#1a6fc4,#1254a0)", 
+                        color: "white", 
+                        border: "none", 
+                        borderRadius: "6px", 
+                        fontSize: "15px", 
+                        fontWeight: "700", 
+                        cursor: certLoading ? "not-allowed" : "pointer",
+                        letterSpacing: "0.3px"
+                      }}
+                    >
+                      {certLoading ? "⏳ Generating..." : "📜 Download Certificate"}
+                    </button>
+
+                    <button
+                      onClick={handleDownloadAttendance}
+                      disabled={attendanceLoading}
+                      style={{ 
+                        width: "100%", 
+                        padding: "13px", 
+                        background: attendanceLoading ? "#7faee8" : "linear-gradient(135deg,#1e8c4e,#14723e)", 
+                        color: "white", 
+                        border: "none", 
+                        borderRadius: "6px", 
+                        fontSize: "15px", 
+                        fontWeight: "700", 
+                        cursor: attendanceLoading ? "not-allowed" : "pointer",
+                        letterSpacing: "0.3px"
+                      }}
+                    >
+                      {attendanceLoading ? "⏳ Generating..." : "📊 Download Attendance Sheet"}
+                    </button>
+                  </div>
+
                   <button
-                    onClick={() => { setSuccess(false); setForm({ name: "", regId: "", dob: "" }); }}
-                    style={{ marginTop: "18px", padding: "10px 26px", background: "#1a6fc4", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "600", fontSize: "14px" }}
+                    onClick={() => { 
+                      setSuccess(false); 
+                      setForm({ name: "", regId: "", dob: "" }); 
+                      setStudentData(null);
+                      setError("");
+                    }}
+                    style={{ marginTop: "8px", padding: "10px 26px", background: "#6c757d", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "600", fontSize: "14px" }}
                   >
                     ← Search Again
                   </button>
