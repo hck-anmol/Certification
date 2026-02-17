@@ -2,26 +2,23 @@ const express = require('express');
 const pool = require('../db');
 const fs = require('fs');
 const path = require('path');
-const { PDFDocument, rgb } = require('pdf-lib');
-
+const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 const router = express.Router();
 
-// Helper function to format date
+// Helper: format date as DD/MM/YYYY
 const formatDate = (dateString) => {
   if (!dateString) return '';
   const date = new Date(dateString);
   return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
-// Helper function to get student data
+// Helper: query student by registration_number + dob
 const getStudentData = async (regId, dob) => {
   try {
-    console.log(`Querying database for registration_number='${regId}' and dob='${dob}'`);
     const [rows] = await pool.execute(
-      "SELECT * FROM students WHERE registration_number = ? AND dob = ?",
+      'SELECT * FROM students WHERE registration_number = ? AND dob = ?',
       [regId, dob]
     );
-    console.log(`Query returned ${rows.length} rows`);
     return rows.length > 0 ? rows[0] : null;
   } catch (error) {
     console.error('Database query error in getStudentData:', error);
@@ -29,398 +26,223 @@ const getStudentData = async (regId, dob) => {
   }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CERTIFICATE GENERATION
+// Template: 864 × 1296 pt (portrait), two identical certificates stacked.
+//   Top cert:    y = 648 – 1296  → baseY = 648
+//   Bottom cert: y = 0   – 648   → baseY = 0
+//
+// All Y coordinates below are RELATIVE to baseY (i.e. distance from the
+// bottom of each certificate box). pdf-lib origin is bottom-left.
+// ─────────────────────────────────────────────────────────────────────────────
 router.post('/generate-certificate', async (req, res) => {
   try {
     const { name, regId, dob } = req.body;
 
-    console.log('Certificate generation request:', { name, regId, dob });
-
     if (!name || !regId || !dob) {
-      return res.status(400).json({ message: "Name, Registration ID, and Date of Birth are required" });
+      return res.status(400).json({ message: 'Name, Registration ID, and Date of Birth are required' });
     }
 
-    console.log('Fetching student data for:', { regId, dob });
     const student = await getStudentData(regId, dob);
-    console.log('Student data found:', student ? 'Yes' : 'No');
-
     if (!student) {
-      console.log('Student not found in database. Available students:');
-      const [allStudents] = await pool.execute("SELECT registration_number, name, dob FROM students");
-      console.log(allStudents);
-      return res.status(404).json({ message: "Student not found. Please verify your credentials." });
+      return res.status(404).json({ message: 'Student not found. Please verify your credentials.' });
     }
-
-    // Verify name matches (case-insensitive)
     if (student.name.toLowerCase().trim() !== name.toLowerCase().trim()) {
-      return res.status(403).json({ message: "Name does not match registration records." });
+      return res.status(403).json({ message: 'Name does not match registration records.' });
     }
 
     const templatePath = path.join(__dirname, '../templates/certificate_template.pdf');
-    
     if (!fs.existsSync(templatePath)) {
-      return res.status(500).json({ message: "Certificate template not found" });
+      return res.status(500).json({ message: 'Certificate template not found' });
     }
 
-    const existingPdfBytes = fs.readFileSync(templatePath);
-    const pdfDoc = await PDFDocument.load(existingPdfBytes);
-    const page = pdfDoc.getPages()[0];
-    const { width, height } = page.getSize();
+    const pdfDoc = await PDFDocument.load(fs.readFileSync(templatePath));
+    const font     = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const page     = pdfDoc.getPages()[0];
 
-    // Format dates
     const startDate = formatDate(student.internship_start);
-    const endDate = formatDate(student.internship_end);
-    const dobFormatted = formatDate(student.dob);
+    const endDate   = formatDate(student.internship_end);
 
-    // Draw student information on certificate
-    // Note: Coordinates need to be adjusted based on your template
-    // These are example coordinates - adjust them to match your template
-    
-    // Student Name (adjust x, y based on your template)
-    page.drawText(student.name || '', {
-      x: 250,
-      y: height - 200,
-      size: 16,
-      color: rgb(0, 0, 0),
-    });
+    /**
+     * fillCertificate – draws student data onto one certificate box.
+     * @param {number} baseY  Bottom Y of the certificate box (0 or 648).
+     */
+    function fillCertificate(baseY) {
+      const draw = (text, x, relY, opts = {}) =>
+        page.drawText(String(text ?? ''), {
+          x,
+          y: baseY + relY,
+          size: opts.size ?? 9,
+          font: opts.bold ? boldFont : font,
+          color: rgb(0, 0, 0),
+        });
 
-    // Father's Name
-    if (student.father_name) {
-      page.drawText(student.father_name, {
-        x: 250,
-        y: height - 230,
-        size: 12,
-        color: rgb(0, 0, 0),
-      });
+      // Certificate number (after "Certificate No.:……")
+      draw(student.certificate_no || '', 185, 370);
+
+      // ── Line 1 ──────────────────────────────────────────────────────────────
+      // "This is to certify that Mr / Miss ……… Son / Daughter of"
+      // Student name fills the dotted area between "Mr / Miss" and "Son / Daughter of"
+      draw(student.name, 310, 320, { size: 10, bold: true });
+
+      // ── Line 2 ──────────────────────────────────────────────────────────────
+      // "Shri/ Smt …[father]……, Reg.No…[reg]……, Roll No…[roll]……,"
+      draw(student.father_name,        103, 296);
+      draw(student.registration_number, 374, 296);
+      draw(student.roll_number,         624, 296);
+
+      // ── Line 3 ──────────────────────────────────────────────────────────────
+      // "Session…[session]……, Department of …[dept]……, Student of …[college]……,"
+      draw(student.session,    103, 268);
+      draw(student.department, 362, 268);
+      draw(student.college,    590, 268);
+
+      // ── Line 4 ──────────────────────────────────────────────────────────────
+      // "…[college]… has undergone Internship Training under the NAF 360 Exposure Program from"
+      draw(student.college, 103, 240);
+
+      // ── Line 5 ──────────────────────────────────────────────────────────────
+      // "……[startDate] to ……[endDate] completing a total of ……[hours] hours,
+      //  and awarded the Grade……[grade]……at"
+      draw(startDate,                   103, 212);
+      draw(endDate,                     213, 212);
+      draw(student.total_hours ?? '',   400, 212);
+      draw(student.grade ?? '',         600, 212);
     }
 
-    // Registration Number
-    page.drawText(student.registration_number || '', {
-      x: 250,
-      y: height - 260,
-      size: 12,
-      color: rgb(0, 0, 0),
-    });
-
-    // Roll Number
-    if (student.roll_number) {
-      page.drawText(student.roll_number, {
-        x: 400,
-        y: height - 260,
-        size: 12,
-        color: rgb(0, 0, 0),
-      });
-    }
-
-    // Session
-    if (student.session) {
-      page.drawText(student.session, {
-        x: 250,
-        y: height - 290,
-        size: 12,
-        color: rgb(0, 0, 0),
-      });
-    }
-
-    // Department
-    if (student.department) {
-      page.drawText(student.department, {
-        x: 400,
-        y: height - 290,
-        size: 12,
-        color: rgb(0, 0, 0),
-      });
-    }
-
-    // College
-    if (student.college) {
-      page.drawText(student.college, {
-        x: 250,
-        y: height - 320,
-        size: 12,
-        color: rgb(0, 0, 0),
-      });
-    }
-
-    // Internship Period
-    if (startDate && endDate) {
-      page.drawText(`${startDate} to ${endDate}`, {
-        x: 250,
-        y: height - 350,
-        size: 12,
-        color: rgb(0, 0, 0),
-      });
-    }
-
-    // Total Hours
-    if (student.total_hours) {
-      page.drawText(`${student.total_hours} hours`, {
-        x: 250,
-        y: height - 380,
-        size: 12,
-        color: rgb(0, 0, 0),
-      });
-    }
-
-    // Grade
-    if (student.grade) {
-      page.drawText(student.grade, {
-        x: 250,
-        y: height - 410,
-        size: 14,
-        color: rgb(0, 0, 0),
-      });
-    }
+    fillCertificate(648); // top certificate
+    fillCertificate(0);   // bottom certificate (duplicate)
 
     const pdfBytes = await pdfDoc.save();
-
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=certificate_${student.registration_number}.pdf`);
-    res.send(pdfBytes);
-
+    res.send(Buffer.from(pdfBytes));
   } catch (err) {
-    console.error('Certificate generation error:', err.message || err);
-    console.error('Full error details:', err);
-    res.status(500).json({ message: "Server Error: Failed to generate certificate", error: err.message });
+    console.error('Certificate generation error:', err);
+    res.status(500).json({ message: 'Server Error: Failed to generate certificate', error: err.message });
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ATTENDANCE SHEET GENERATION
+// Template: 1296 × 864 pt (landscape), two identical sheets side-by-side.
+//   Left sheet:  x = 0   – 648  → xOffset = 0
+//   Right sheet: x = 648 – 1296 → xOffset = 648
+//
+// All X coordinates below are RELATIVE to xOffset.
+// Y coordinates are absolute (pdf-lib origin = bottom-left).
+//
+// Header field Y values (absolute):
+//   NAME / COLLEGE row      : 668
+//   FATHER / DEPARTMENT row : 645
+//   REG.NO / SESSION row    : 622
+//   ROLL NO / START DATE row: 599
+//   MOB NO / END DATE row   : 576
+//
+// Attendance table:
+//   First data row (Day 1) top: y = 492
+//   Row height: ~24.2 pt
+//   Left table  (Days  1-15): Present col = xOffset+178, Hour col = xOffset+229
+//   Right table (Days 16-30): Present col = xOffset+452, Hour col = xOffset+510
+//
+// Totals row:
+//   Total Internship Days : y = 110
+//   Total Hours           : y =  91
+// ─────────────────────────────────────────────────────────────────────────────
 router.post('/generate-attendance', async (req, res) => {
   try {
-    console.log('Attendance request received:', { name: req.body.name, regId: req.body.regId, dob: req.body.dob });
-    
     const { name, regId, dob } = req.body;
 
     if (!name || !regId || !dob) {
-      return res.status(400).json({ message: "Name, Registration ID, and Date of Birth are required" });
+      return res.status(400).json({ message: 'Name, Registration ID, and Date of Birth are required' });
     }
 
     const student = await getStudentData(regId, dob);
-
     if (!student) {
-      return res.status(404).json({ message: "Student not found. Please verify your credentials." });
+      return res.status(404).json({ message: 'Student not found. Please verify your credentials.' });
     }
-
-    // Verify name matches (case-insensitive)
     if (student.name.toLowerCase().trim() !== name.toLowerCase().trim()) {
-      return res.status(403).json({ message: "Name does not match registration records." });
+      return res.status(403).json({ message: 'Name does not match registration records.' });
     }
 
-    // Fetch attendance records
+    // Fetch attendance records ordered by day_number
     const [attendanceRows] = await pool.execute(
-      "SELECT * FROM attendance WHERE student_id = ? ORDER BY day_number ASC",
+      'SELECT * FROM attendance WHERE student_id = ? ORDER BY day_number ASC',
       [student.id]
     );
 
     const templatePath = path.join(__dirname, '../templates/attendance_template.pdf');
-    
-    // If template doesn't exist, create attendance sheet from scratch
-    let pdfDoc;
-    let page;
-    
-    if (fs.existsSync(templatePath)) {
-      const existingPdfBytes = fs.readFileSync(templatePath);
-      pdfDoc = await PDFDocument.load(existingPdfBytes);
-      page = pdfDoc.getPages()[0];
-    } else {
-      // Create new PDF if template doesn't exist
-      pdfDoc = await PDFDocument.create();
-      page = pdfDoc.addPage([595, 842]); // A4 size
-      
-      // Draw header
-      page.drawText('ATTENDANCE SHEET', {
-        x: 200,
-        y: 800,
-        size: 20,
-        color: rgb(0, 0, 0),
-      });
+    if (!fs.existsSync(templatePath)) {
+      return res.status(500).json({ message: 'Attendance template not found' });
     }
 
-    const { width, height } = page.getSize();
+    const pdfDoc = await PDFDocument.load(fs.readFileSync(templatePath));
+    const font   = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const page   = pdfDoc.getPages()[0];
 
-    // Draw student information
-    let yPosition = height - 100;
-    
-    page.drawText('Student Name:', {
-      x: 50,
-      y: yPosition,
-      size: 12,
-      color: rgb(0, 0, 0),
-    });
-    page.drawText(student.name || '', {
-      x: 200,
-      y: yPosition,
-      size: 12,
-      color: rgb(0, 0, 0),
-    });
+    const startDate = formatDate(student.internship_start);
+    const endDate   = formatDate(student.internship_end);
 
-    yPosition -= 30;
-    page.drawText('Registration Number:', {
-      x: 50,
-      y: yPosition,
-      size: 12,
-      color: rgb(0, 0, 0),
-    });
-    page.drawText(student.registration_number || '', {
-      x: 200,
-      y: yPosition,
-      size: 12,
-      color: rgb(0, 0, 0),
-    });
+    /**
+     * fillAttendance – draws student data + attendance onto one sheet.
+     * @param {number} xOff  Left X of the sheet box (0 or 648).
+     */
+    function fillAttendance(xOff) {
+      const draw = (text, relX, y, size = 9) =>
+        page.drawText(String(text ?? ''), { x: xOff + relX, y, size, font, color: rgb(0, 0, 0) });
 
-    yPosition -= 30;
-    page.drawText('Roll Number:', {
-      x: 50,
-      y: yPosition,
-      size: 12,
-      color: rgb(0, 0, 0),
-    });
-    page.drawText(student.roll_number || 'N/A', {
-      x: 200,
-      y: yPosition,
-      size: 12,
-      color: rgb(0, 0, 0),
-    });
+      // ── Header fields ────────────────────────────────────────────────────────
+      draw(student.name,                185, 668);
+      draw(student.college,             430, 668, 8);
+      draw(student.father_name,         185, 645, 8.5);
+      draw(student.department,          430, 645, 8.5);
+      draw(student.registration_number, 185, 622);
+      draw(student.session,             430, 622);
+      draw(student.roll_number,         185, 599);
+      draw(startDate,                   480, 599);
+      draw(student.mob_no ?? '',        185, 576);
+      draw(endDate,                     480, 576);
 
-    yPosition -= 30;
-    page.drawText('Department:', {
-      x: 50,
-      y: yPosition,
-      size: 12,
-      color: rgb(0, 0, 0),
-    });
-    page.drawText(student.department || 'N/A', {
-      x: 200,
-      y: yPosition,
-      size: 12,
-      color: rgb(0, 0, 0),
-    });
+      // ── Attendance table ─────────────────────────────────────────────────────
+      const ROW_Y0 = 492;   // Y of Day-1 data row
+      const ROW_H  = 24.2;  // height per row in points
 
-    yPosition -= 30;
-    page.drawText('Session:', {
-      x: 50,
-      y: yPosition,
-      size: 12,
-      color: rgb(0, 0, 0),
-    });
-    page.drawText(student.session || 'N/A', {
-      x: 200,
-      y: yPosition,
-      size: 12,
-      color: rgb(0, 0, 0),
-    });
-
-    yPosition -= 30;
-    page.drawText('Total Hours:', {
-      x: 50,
-      y: yPosition,
-      size: 12,
-      color: rgb(0, 0, 0),
-    });
-    page.drawText((student.total_hours || 0).toString(), {
-      x: 200,
-      y: yPosition,
-      size: 12,
-      color: rgb(0, 0, 0),
-    });
-
-    // Draw attendance table header
-    yPosition -= 50;
-    page.drawText('Day', {
-      x: 50,
-      y: yPosition,
-      size: 11,
-      color: rgb(0, 0, 0),
-    });
-    page.drawText('Present', {
-      x: 150,
-      y: yPosition,
-      size: 11,
-      color: rgb(0, 0, 0),
-    });
-    page.drawText('Hours', {
-      x: 250,
-      y: yPosition,
-      size: 11,
-      color: rgb(0, 0, 0),
-    });
-
-    // Draw attendance records
-    yPosition -= 25;
-    let totalPresent = 0;
-    let totalHours = 0;
-
-    attendanceRows.forEach((record, index) => {
-      if (yPosition < 100) {
-        // Add new page if needed
-        page = pdfDoc.addPage([595, 842]);
-        yPosition = height - 50;
+      // Days 1-15  (left half of table)
+      for (let i = 0; i < 15; i++) {
+        const record = attendanceRows[i];
+        if (!record) continue;
+        const y = ROW_Y0 - i * ROW_H;
+        draw(record.present ? 'P' : 'A', 178, y);
+        if (record.present) draw(record.hours ?? 1, 229, y);
       }
 
-      page.drawText(record.day_number?.toString() || (index + 1).toString(), {
-        x: 50,
-        y: yPosition,
-        size: 10,
-        color: rgb(0, 0, 0),
-      });
-      
-      const presentText = record.present ? 'Yes' : 'No';
-      page.drawText(presentText, {
-        x: 150,
-        y: yPosition,
-        size: 10,
-        color: rgb(0, 0, 0),
-      });
-      
-      page.drawText((record.hours || 0).toString(), {
-        x: 250,
-        y: yPosition,
-        size: 10,
-        color: rgb(0, 0, 0),
-      });
-
-      if (record.present) {
-        totalPresent++;
-        totalHours += record.hours || 0;
+      // Days 16-30 (right half of table)
+      for (let i = 15; i < 30; i++) {
+        const record = attendanceRows[i];
+        if (!record) continue;
+        const y = ROW_Y0 - (i - 15) * ROW_H;
+        draw(record.present ? 'P' : 'A', 452, y);
+        if (record.present) draw(record.hours ?? 1, 510, y);
       }
 
-      yPosition -= 20;
-    });
+      // ── Totals ───────────────────────────────────────────────────────────────
+      const totalDays  = attendanceRows.filter(r => r.present).length;
+      const totalHours = attendanceRows.reduce((sum, r) => sum + (r.hours ?? 0), 0);
+      draw(totalDays,  218, 110);
+      draw(totalHours, 218,  91);
+    }
 
-    // Draw summary
-    yPosition -= 30;
-    page.drawText('Summary:', {
-      x: 50,
-      y: yPosition,
-      size: 12,
-      color: rgb(0, 0, 0),
-    });
-
-    yPosition -= 25;
-    page.drawText(`Total Days Present: ${totalPresent}`, {
-      x: 50,
-      y: yPosition,
-      size: 11,
-      color: rgb(0, 0, 0),
-    });
-
-    yPosition -= 20;
-    page.drawText(`Total Hours: ${totalHours}`, {
-      x: 50,
-      y: yPosition,
-      size: 11,
-      color: rgb(0, 0, 0),
-    });
+    fillAttendance(0);   // left sheet
+    fillAttendance(648); // right sheet (duplicate)
 
     const pdfBytes = await pdfDoc.save();
-
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=attendance_${student.registration_number}.pdf`);
-    res.send(pdfBytes);
-
+    res.send(Buffer.from(pdfBytes));
   } catch (err) {
-    console.error('Attendance sheet generation error:', err.message || err);
-    console.error('Full error details:', err);
-    res.status(500).json({ message: "Server Error: Failed to generate attendance sheet", error: err.message });
+    console.error('Attendance sheet generation error:', err);
+    res.status(500).json({ message: 'Server Error: Failed to generate attendance sheet', error: err.message });
   }
 });
 
