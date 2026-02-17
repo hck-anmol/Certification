@@ -84,7 +84,7 @@ router.post('/generate-certificate', async (req, res) => {
       // ── Line 1 ──────────────────────────────────────────────────────────────
       // "This is to certify that Mr / Miss ……… Son / Daughter of"
       // Student name fills the dotted area between "Mr / Miss" and "Son / Daughter of"
-      draw(student.name, 310, 320, { size: 10, bold: true });
+      draw(student.name, 305, 320, { size: 15, bold: true });
 
       // ── Line 2 ──────────────────────────────────────────────────────────────
       // "Shri/ Smt …[father]……, Reg.No…[reg]……, Roll No…[roll]……,"
