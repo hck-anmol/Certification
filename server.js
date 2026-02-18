@@ -8,31 +8,44 @@ const certificateRoute = require('./routes/certificate');
 
 const app = express();
 
-app.use(cors());
+// Trust Railway proxy
+app.set('trust proxy', 1);
+
+// Middleware
+app.use(cors({
+  origin: process.env.FRONTEND_URL || '*',
+  methods: ['GET', 'POST'],
+  credentials: true
+}));
+
 app.use(helmet());
 app.use(express.json());
 
+// Rate limiting
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false
 }));
 
+// Routes
 app.use('/api', certificateRoute);
 
-// Health check endpoint
+// Health check
 app.get('/health', (req, res) => {
-  res.json({ message: 'Server is running correctly!' });
+  res.status(200).json({ message: 'Server is running correctly!' });
 });
 
-// Use PORT from environment if available, otherwise default to 5000
+// Port
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: DB_HOST=${process.env.DB_HOST}, DB_USER=${process.env.DB_USER}, DB_NAME=${process.env.DB_NAME}`);
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
-// Handle unhandled errors
+// Global error handlers
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
 });
