@@ -79,7 +79,7 @@ router.post('/generate-certificate', async (req, res) => {
         });
 
       // Certificate number (after "Certificate No.:……")
-      draw(student.certificate_no || '', 185, 370);
+      draw(student.certificate_number || '', 185, 370);
 
       // ── Line 1 ──────────────────────────────────────────────────────────────
       // "This is to certify that Mr / Miss ……… Son / Daughter of"
@@ -204,7 +204,7 @@ router.post('/generate-attendance', async (req, res) => {
       draw(student.session, 455, 627, 12, true);
       draw(student.roll_number, 195, 601);
       draw(startDate, 455, 601);
-      draw(student.mob_no ?? '', 195, 576);
+      draw(student.mobile_number ?? '', 195, 576);
       draw(endDate, 455, 576);
 
       // ── Attendance table ─────────────────────────────────────────────────────
