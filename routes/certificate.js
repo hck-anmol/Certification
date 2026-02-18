@@ -57,12 +57,12 @@ router.post('/generate-certificate', async (req, res) => {
     }
 
     const pdfDoc = await PDFDocument.load(fs.readFileSync(templatePath));
-    const font     = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const page     = pdfDoc.getPages()[0];
+    const page = pdfDoc.getPages()[0];
 
     const startDate = formatDate(student.internship_start);
-    const endDate   = formatDate(student.internship_end);
+    const endDate = formatDate(student.internship_end);
 
     /**
      * fillCertificate – draws student data onto one certificate box.
@@ -88,15 +88,15 @@ router.post('/generate-certificate', async (req, res) => {
 
       // ── Line 2 ──────────────────────────────────────────────────────────────
       // "Shri/ Smt …[father]……, Reg.No…[reg]……, Roll No…[roll]……,"
-      draw(student.father_name,        163, 306 , { size: 15, bold: true });
-      draw(student.registration_number, 394, 306 , { size: 15, bold: true });
-      draw(student.roll_number,         674, 306 , { size: 15, bold: true });
+      draw(student.father_name, 163, 306, { size: 15, bold: true });
+      draw(student.registration_number, 394, 306, { size: 15, bold: true });
+      draw(student.roll_number, 674, 306, { size: 15, bold: true });
 
       // ── Line 3 ──────────────────────────────────────────────────────────────
       // "Session…[session]……, Department of …[dept]……, Student of …[college]……,"
-      draw(student.session,    123, 271 , { size: 15, bold: true });
-      draw(student.department, 392, 271 , { size: 15, bold: true });
-      draw(student.college,    650, 271 , { size: 15, bold: true });
+      draw(student.session, 123, 271, { size: 15, bold: true });
+      draw(student.department, 392, 271, { size: 15, bold: true });
+      draw(student.college, 650, 271, { size: 15, bold: true });
 
       // ── Line 4 ──────────────────────────────────────────────────────────────
       // "…[college]… has undergone Internship Training under the NAF 360 Exposure Program from"
@@ -105,10 +105,10 @@ router.post('/generate-certificate', async (req, res) => {
       // ── Line 5 ──────────────────────────────────────────────────────────────
       // "……[startDate] to ……[endDate] completing a total of ……[hours] hours,
       //  and awarded the Grade……[grade]……at"
-      draw(startDate,                   33, 200 , { size: 15, bold: true });
-      draw(endDate,                     138, 200, { size: 15, bold: true } );
-      draw(student.total_hours ?? '',   400, 200 ,  { size: 15, bold: true });
-      draw(student.grade ?? '',         700, 200, { size: 15, bold: true });
+      draw(startDate, 33, 200, { size: 15, bold: true });
+      draw(endDate, 138, 200, { size: 15, bold: true });
+      draw(student.total_hours ?? '', 400, 200, { size: 15, bold: true });
+      draw(student.grade ?? '', 700, 200, { size: 15, bold: true });
     }
 
     fillCertificate(648); // top certificate
@@ -178,62 +178,64 @@ router.post('/generate-attendance', async (req, res) => {
     }
 
     const pdfDoc = await PDFDocument.load(fs.readFileSync(templatePath));
-    const font   = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const page   = pdfDoc.getPages()[0];
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const page = pdfDoc.getPages()[0];
 
     const startDate = formatDate(student.internship_start);
-    const endDate   = formatDate(student.internship_end);
+    const endDate = formatDate(student.internship_end);
 
     /**
      * fillAttendance – draws student data + attendance onto one sheet.
      * @param {number} xOff  Left X of the sheet box (0 or 648).
      */
     function fillAttendance(xOff) {
-      const draw = (text, relX, y, size = 11, bold = true) => {
+      const draw = (text, relX, y, size = 11, bold = false) => {
         const options = { x: xOff + relX, y, size, font, color: rgb(0, 0, 0) };
         if (bold) options.bold = true;
         page.drawText(String(text ?? ''), options);
       };
 
       // ── Header fields ────────────────────────────────────────────────────────
-      draw(student.name,                185, 668);
-      draw(student.college,             430, 668, 8);
-      draw(student.father_name,         185, 645, 8.5);
-      draw(student.department,          430, 645, 8.5);
-      draw(student.registration_number, 185, 622);
-      draw(student.session,             430, 622);
-      draw(student.roll_number,         185, 599);
-      draw(startDate,                   480, 599);
-      draw(student.mob_no ?? '',        185, 576);
-      draw(endDate,                     480, 576);
+      draw(student.name, 195, 676, 12, true);
+      draw(student.college, 440, 678, 10, true);
+      draw(student.father_name, 195, 652, 12);
+      draw(student.department, 440, 652, 10);
+      draw(student.registration_number, 195, 627, 12, true);
+      draw(student.session, 455, 627, 12, true);
+      draw(student.roll_number, 195, 601);
+      draw(startDate, 455, 601);
+      draw(student.mob_no ?? '', 195, 576);
+      draw(endDate, 455, 576);
 
       // ── Attendance table ─────────────────────────────────────────────────────
       const ROW_Y0 = 492;   // Y of Day-1 data row
-      const ROW_H  = 24.2;  // height per row in points
+      const ROW_H = 26.8;  // height per row in points
 
       // Days 1-15  (left half of table)
-      for (let i = 0; i < 15; i++) {
+      for (let i = 0; i < 14; i++) {
         const record = attendanceRows[i];
         if (!record) continue;
         const y = ROW_Y0 - i * ROW_H;
-        draw(record.present ? 'P' : 'A', 178, y);
-        if (record.present) draw(record.hours ?? 1, 229, y);
+        draw(record.present ? 'Present' : 'Absent', 178, y, 12);
+        if (record.present) draw(record.hours ?? 1, 279, y, 12);
       }
+
+      const ROW_Y0R = 518.8;   // Y of Day-1 data row
 
       // Days 16-30 (right half of table)
       for (let i = 15; i < 30; i++) {
         const record = attendanceRows[i];
         if (!record) continue;
-        const y = ROW_Y0 - (i - 15) * ROW_H;
-        draw(record.present ? 'P' : 'A', 452, y);
+        const y = ROW_Y0R - (i - 15) * ROW_H;
+        draw(record.present ? 'Present' : 'Absent', 410, y);
         if (record.present) draw(record.hours ?? 1, 510, y);
       }
 
       // ── Totals ───────────────────────────────────────────────────────────────
-      const totalDays  = attendanceRows.filter(r => r.present).length;
+      const totalDays = attendanceRows.filter(r => r.present).length;
       const totalHours = attendanceRows.reduce((sum, r) => sum + (r.hours ?? 0), 0);
-      draw(totalDays,  218, 110);
-      draw(totalHours, 218,  91);
+      draw(totalDays, 218, 110);
+      draw(totalHours, 218, 91);
     }
 
     fillAttendance(0);   // left sheet
