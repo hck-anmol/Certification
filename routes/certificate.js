@@ -269,27 +269,38 @@ router.post('/generate-attendance', async (req, res) => {
        * @param {number}  [size=11]
        * @param {boolean} [bold=false]
        */
-      function draw(text, relX, y, size = 11, bold = false) {
-        page.drawText(String(text ?? ''), {
-          x: xOff + relX,
+      function draw(text, centerRelX, y, size = 11, bold = false) {
+        const safeText = String(text ?? '');
+        const activeFont = bold ? boldFont : font;
+        const textWidth = activeFont.widthOfTextAtSize(safeText, size);
+
+        page.drawText(safeText, {
+          x: xOff + centerRelX - textWidth / 2,
           y,
           size,
-          font: bold ? boldFont : font,
+          font: activeFont,
           color: rgb(0, 0, 0),
         });
       }
+      function truncateWithEllipsis(text = '', maxLength = 20) {
+        const safeText = String(text).trim();
+        if (safeText.length <= maxLength) return safeText;
+        return safeText.slice(0, maxLength - 3) + '...';
+      }
 
       // ── Header fields ────────────────────────────────────────────────────────
-      draw(student.name, 195, 676, 12, true);
-      draw(student.college, 440, 678, 10, true);
-      draw(student.father_name, 195, 652, 12);
-      draw(student.department, 440, 652, 10);
-      draw(student.registration_number, 195, 627, 12, true);
-      draw(student.session, 455, 627, 12, true);
-      draw(student.roll_number, 195, 601);
-      draw(startDate, 455, 601);
-      draw(student.mobile_number ?? '', 195, 576);
-      draw(endDate, 455, 576);
+      draw(student.name, 235, 677, 12, true);
+      const collegeShort = truncateWithEllipsis(student.college, 20);
+      draw(collegeShort, 488, 677, 10);
+
+      draw(student.father_name, 235, 652, 12, true);
+      draw(student.department, 488, 652, 10);
+      draw(student.registration_number, 235, 627, 12, true);
+      draw(student.session, 488, 627, 10, true);
+      draw(student.roll_number, 235, 601);
+      draw(startDate, 488, 601);
+      draw(student.mobile_number ?? '', 235, 576);
+      draw(endDate, 488, 576);
 
       // ── Attendance table ─────────────────────────────────────────────────────
       const ROW_H = 26.8; // height per row in points
@@ -299,8 +310,8 @@ router.post('/generate-attendance', async (req, res) => {
       for (let i = 0; i < 14; i++) {          // FIX: was i < 14 (only 14 rows)
         const record = attendanceRows[i];
         if (!record) continue;
-        const y = ROW_Y0 - i * ROW_H;
-        draw(record.present ? 'P' : 'A', 178, y, 12);
+        const y = ROW_Y0_LEFT - i * ROW_H;
+        draw(record.present ? 'Present' : 'Absent', 198, y, 12);
         if (record.present) draw(record.hours ?? 1, 279, y, 12);
       }
 
@@ -309,8 +320,8 @@ router.post('/generate-attendance', async (req, res) => {
       for (let i = 0; i < 15; i++) {          // FIX: was i = 15..29 which made indexing awkward
         const record = attendanceRows[15 + i]; // index 15–29
         if (!record) continue;
-        const y = ROW_Y0R - (i - 15) * ROW_H;
-        draw(record.present ? 'P' : 'A', 410, y);
+        const y = ROW_Y0_RIGHT - i * ROW_H;
+        draw(record.present ? 'Present' : 'Absent', 430, y);
         if (record.present) draw(record.hours ?? 1, 510, y);
       }
 
@@ -318,7 +329,7 @@ router.post('/generate-attendance', async (req, res) => {
       const totalDays = attendanceRows.filter(r => r.present).length;
       const totalHours = attendanceRows.reduce((sum, r) => sum + (r.hours ?? 0), 0);
       draw(totalDays, 218, 110);
-      draw(totalHours, 218, 91);
+      draw(totalHours, 218, 89);
     }
 
     fillAttendance(0);   // left sheet
