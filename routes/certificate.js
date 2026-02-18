@@ -299,8 +299,8 @@ router.post('/generate-attendance', async (req, res) => {
       for (let i = 0; i < 14; i++) {          // FIX: was i < 14 (only 14 rows)
         const record = attendanceRows[i];
         if (!record) continue;
-        const y = ROW_Y0_LEFT - i * ROW_H;
-        draw(record.present ? 'Present' : 'Absent', 178, y, 12);
+        const y = ROW_Y0 - i * ROW_H;
+        draw(record.present ? 'P' : 'A', 178, y, 12);
         if (record.present) draw(record.hours ?? 1, 279, y, 12);
       }
 
@@ -309,8 +309,8 @@ router.post('/generate-attendance', async (req, res) => {
       for (let i = 0; i < 15; i++) {          // FIX: was i = 15..29 which made indexing awkward
         const record = attendanceRows[15 + i]; // index 15–29
         if (!record) continue;
-        const y = ROW_Y0_RIGHT - i * ROW_H;
-        draw(record.present ? 'Present' : 'Absent', 410, y);
+        const y = ROW_Y0R - (i - 15) * ROW_H;
+        draw(record.present ? 'P' : 'A', 410, y);
         if (record.present) draw(record.hours ?? 1, 510, y);
       }
 
