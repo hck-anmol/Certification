@@ -311,8 +311,10 @@ router.post('/generate-attendance', async (req, res) => {
         const record = attendanceRows[i];
         if (!record) continue;
         const y = ROW_Y0_LEFT - i * ROW_H;
-        draw(record.present ? 'Present' : 'Absent', 198, y, 12);
-        if (record.present) draw(record.hours ?? 1, 279, y, 12);
+        const isPresent = record.hours === 1;
+
+        draw(isPresent ? 'Present' : 'Absent', 198, y, 12);
+        draw(record.hours ?? 0, 279, y, 12);
       }
 
       // Days 16–30 (indices 15–29, right half of table)
@@ -321,12 +323,14 @@ router.post('/generate-attendance', async (req, res) => {
         const record = attendanceRows[15 + i]; // index 15–29
         if (!record) continue;
         const y = ROW_Y0_RIGHT - i * ROW_H;
-        draw(record.present ? 'Present' : 'Absent', 430, y);
-        if (record.present) draw(record.hours ?? 1, 510, y);
+        const isPresent = record.hours === 1;
+
+        draw(isPresent ? 'Present' : 'Absent', 430, y);
+        draw(record.hours ?? 0, 510, y);
       }
 
       // ── Totals ───────────────────────────────────────────────────────────────
-      const totalDays = attendanceRows.filter(r => r.present).length;
+      const totalDays = attendanceRows.filter(r => r.hours === 1).length;
       const totalHours = attendanceRows.reduce((sum, r) => sum + (r.hours ?? 0), 0);
       draw(totalDays, 218, 110);
       draw(totalHours, 218, 89);
