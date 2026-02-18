@@ -98,7 +98,7 @@ router.post('/generate-certificate', async (req, res) => {
       // Helper: split college name into chunks of 20 chars
       // Helper: split college name into word-safe chunks (max 24 chars each)
       const splitCollegeName = (college = '') => {
-        const MAX_LEN = 24;
+        const MAX_LEN = 22;
         const words = college.trim().split(/\s+/);
 
         let part1Words = [];
