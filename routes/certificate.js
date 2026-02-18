@@ -69,46 +69,115 @@ router.post('/generate-certificate', async (req, res) => {
      * @param {number} baseY  Bottom Y of the certificate box (0 or 648).
      */
     function fillCertificate(baseY) {
-      const draw = (text, x, relY, opts = {}) =>
-        page.drawText(String(text ?? ''), {
-          x,
-          y: baseY + relY,
-          size: opts.size ?? 9,
-          font: opts.bold ? boldFont : font,
-          color: rgb(0, 0, 0),
-        });
 
-      // Certificate number (after "Certificate No.:……")
-      draw(student.certificate_number || '', 185, 370);
+      /**
+       * draw – centre-align text at (centerX, baseY + relY).
+       *
+       * @param {string}  text      Text to draw.
+       * @param {number}  centerX   Absolute X centre point.
+       * @param {number}  relY      Y offset relative to baseY.
+       * @param {object}  [opts]
+       * @param {number}  [opts.size=12]          Font size in pt.
+       * @param {boolean} [opts.bold=false]        Use bold font.
+       * @param {Color}   [opts.color=rgb(0,0,0)] Text colour.
+       */
+      function draw(text, centerX, relY, { size = 12, bold = false, color = rgb(0, 0, 0) } = {}) {
+        const safeText = String(text ?? '');
+        const activeFont = bold ? boldFont : font;
+        const textWidth = activeFont.widthOfTextAtSize(safeText, size);
+
+        page.drawText(safeText, {
+          x: centerX - textWidth / 2,
+          y: baseY + relY,
+          size,
+          font: activeFont,
+          color,
+        });
+      }
+
+      // Helper: split college name into chunks of 20 chars
+      // Helper: split college name into word-safe chunks (max 24 chars each)
+      const splitCollegeName = (college = '') => {
+        const MAX_LEN = 24;
+        const words = college.trim().split(/\s+/);
+
+        let part1Words = [];
+        let part2Words = [];
+        let currentLen = 0;
+        let index = 0;
+
+        // Build part 1
+        while (index < words.length) {
+          const word = words[index];
+          const extraLen = (currentLen === 0 ? word.length : word.length + 1);
+
+          if (currentLen + extraLen <= MAX_LEN) {
+            part1Words.push(word);
+            currentLen += extraLen;
+            index++;
+          } else {
+            break;
+          }
+        }
+
+        // Build part 2
+        currentLen = 0;
+        while (index < words.length) {
+          const word = words[index];
+          const extraLen = (currentLen === 0 ? word.length : word.length + 1);
+
+          if (currentLen + extraLen <= MAX_LEN) {
+            part2Words.push(word);
+            currentLen += extraLen;
+            index++;
+          } else {
+            break;
+          }
+        }
+
+        const part1 = part1Words.join(' ');
+        const part2 = part2Words.length ? `-${part2Words.join(' ')}` : '';
+        const continuation = index < words.length ? '...' : '';
+
+        return { part1, part2, continuation };
+      };
+
+      // ── Certificate number ────────────────────────────────────────────────
+      // "Certificate No.:……"
+      draw(student.certificate_number || '', 158, 380, { size: 15, bold: true });
 
       // ── Line 1 ──────────────────────────────────────────────────────────────
       // "This is to certify that Mr / Miss ……… Son / Daughter of"
-      // Student name fills the dotted area between "Mr / Miss" and "Son / Daughter of"
-      draw(student.name, 465, 335, { size: 15, bold: true });
+      draw(student.name, 540, 335, { bold: true, size: 15 });
 
       // ── Line 2 ──────────────────────────────────────────────────────────────
       // "Shri/ Smt …[father]……, Reg.No…[reg]……, Roll No…[roll]……,"
-      draw(student.father_name, 163, 306, { size: 15, bold: true });
-      draw(student.registration_number, 394, 306, { size: 15, bold: true });
-      draw(student.roll_number, 674, 306, { size: 15, bold: true });
+      draw(student.father_name, 190, 306, { size: 15, bold: true });
+      draw(student.registration_number, 450, 306, { size: 15, bold: true });
+      draw(student.roll_number, 714, 306, { size: 15, bold: true });
 
       // ── Line 3 ──────────────────────────────────────────────────────────────
       // "Session…[session]……, Department of …[dept]……, Student of …[college]……,"
-      draw(student.session, 123, 271, { size: 15, bold: true });
-      draw(student.department, 392, 271, { size: 15, bold: true });
-      draw(student.college, 650, 271, { size: 15, bold: true });
+      draw(student.session, 168, 271, { size: 15, bold: true });
+      draw(student.department, 467, 271, { size: 15, bold: true });
 
-      // ── Line 4 ──────────────────────────────────────────────────────────────
-      // "…[college]… has undergone Internship Training under the NAF 360 Exposure Program from"
-      draw(student.college, 103, 240);
+      const { part1, part2, continuation } = splitCollegeName(student.college);
+      console.log('College split test:');
+      console.log('Part 1:', part1);
+      console.log('Part 2:', part2);
+      console.log('Continuation:', continuation);
+
+      draw(part1, 730, 271, { size: 15, bold: true });
+      draw(part2, 131, 236, { size: 15, bold: true });
+      draw(continuation, 103 + 20 * 2, 233, { size: 15, bold: true });
 
       // ── Line 5 ──────────────────────────────────────────────────────────────
       // "……[startDate] to ……[endDate] completing a total of ……[hours] hours,
-      //  and awarded the Grade……[grade]……at"
-      draw(startDate, 33, 200, { size: 15, bold: true });
-      draw(endDate, 138, 200, { size: 15, bold: true });
+      //  and awarded the Grade……[grade]…… at"
+      draw(startDate, 75, 200, { size: 15, bold: true });
+      draw(endDate, 175, 200, { size: 15, bold: true });
       draw(student.total_hours ?? '', 400, 200, { size: 15, bold: true });
-      draw(student.grade ?? '', 700, 200, { size: 15, bold: true });
+      draw(student.grade ?? '', 710, 200, { size: 15, bold: true });
     }
 
     fillCertificate(648); // top certificate
@@ -142,9 +211,9 @@ router.post('/generate-certificate', async (req, res) => {
 //
 // Attendance table:
 //   First data row (Day 1) top: y = 492
-//   Row height: ~24.2 pt
-//   Left table  (Days  1-15): Present col = xOffset+178, Hour col = xOffset+229
-//   Right table (Days 16-30): Present col = xOffset+452, Hour col = xOffset+510
+//   Row height: ~26.8 pt
+//   Left table  (Days  1-15): Present col = xOffset+178, Hour col = xOffset+279
+//   Right table (Days 16-30): Present col = xOffset+410, Hour col = xOffset+510
 //
 // Totals row:
 //   Total Internship Days : y = 110
@@ -179,6 +248,7 @@ router.post('/generate-attendance', async (req, res) => {
 
     const pdfDoc = await PDFDocument.load(fs.readFileSync(templatePath));
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const page = pdfDoc.getPages()[0];
 
     const startDate = formatDate(student.internship_start);
@@ -189,11 +259,25 @@ router.post('/generate-attendance', async (req, res) => {
      * @param {number} xOff  Left X of the sheet box (0 or 648).
      */
     function fillAttendance(xOff) {
-      const draw = (text, relX, y, size = 11, bold = false) => {
-        const options = { x: xOff + relX, y, size, font, color: rgb(0, 0, 0) };
-        if (bold) options.bold = true;
-        page.drawText(String(text ?? ''), options);
-      };
+
+      /**
+       * draw – place text at (xOff + relX, y).
+       *
+       * @param {string}  text    Text to draw.
+       * @param {number}  relX    X offset relative to xOff.
+       * @param {number}  y       Absolute Y coordinate.
+       * @param {number}  [size=11]
+       * @param {boolean} [bold=false]
+       */
+      function draw(text, relX, y, size = 11, bold = false) {
+        page.drawText(String(text ?? ''), {
+          x: xOff + relX,
+          y,
+          size,
+          font: bold ? boldFont : font,
+          color: rgb(0, 0, 0),
+        });
+      }
 
       // ── Header fields ────────────────────────────────────────────────────────
       draw(student.name, 195, 676, 12, true);
@@ -208,25 +292,24 @@ router.post('/generate-attendance', async (req, res) => {
       draw(endDate, 455, 576);
 
       // ── Attendance table ─────────────────────────────────────────────────────
-      const ROW_Y0 = 492;   // Y of Day-1 data row
-      const ROW_H = 26.8;  // height per row in points
+      const ROW_H = 26.8; // height per row in points
 
-      // Days 1-15  (left half of table)
-      for (let i = 0; i < 14; i++) {
+      // Days 1–15 (indices 0–14, left half of table)
+      const ROW_Y0_LEFT = 492;
+      for (let i = 0; i < 14; i++) {          // FIX: was i < 14 (only 14 rows)
         const record = attendanceRows[i];
         if (!record) continue;
-        const y = ROW_Y0 - i * ROW_H;
+        const y = ROW_Y0_LEFT - i * ROW_H;
         draw(record.present ? 'Present' : 'Absent', 178, y, 12);
         if (record.present) draw(record.hours ?? 1, 279, y, 12);
       }
 
-      const ROW_Y0R = 518.8;   // Y of Day-1 data row
-
-      // Days 16-30 (right half of table)
-      for (let i = 15; i < 30; i++) {
-        const record = attendanceRows[i];
+      // Days 16–30 (indices 15–29, right half of table)
+      const ROW_Y0_RIGHT = 518.8;
+      for (let i = 0; i < 15; i++) {          // FIX: was i = 15..29 which made indexing awkward
+        const record = attendanceRows[15 + i]; // index 15–29
         if (!record) continue;
-        const y = ROW_Y0R - (i - 15) * ROW_H;
+        const y = ROW_Y0_RIGHT - i * ROW_H;
         draw(record.present ? 'Present' : 'Absent', 410, y);
         if (record.present) draw(record.hours ?? 1, 510, y);
       }
