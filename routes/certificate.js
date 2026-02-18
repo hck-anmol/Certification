@@ -84,19 +84,19 @@ router.post('/generate-certificate', async (req, res) => {
       // ── Line 1 ──────────────────────────────────────────────────────────────
       // "This is to certify that Mr / Miss ……… Son / Daughter of"
       // Student name fills the dotted area between "Mr / Miss" and "Son / Daughter of"
-      draw(student.name, 305, 320, { size: 15, bold: true });
+      draw(student.name, 465, 335, { size: 15, bold: true });
 
       // ── Line 2 ──────────────────────────────────────────────────────────────
       // "Shri/ Smt …[father]……, Reg.No…[reg]……, Roll No…[roll]……,"
-      draw(student.father_name,        103, 296);
-      draw(student.registration_number, 374, 296);
-      draw(student.roll_number,         624, 296);
+      draw(student.father_name,        163, 306 , { size: 15, bold: true });
+      draw(student.registration_number, 394, 306 , { size: 15, bold: true });
+      draw(student.roll_number,         674, 306 , { size: 15, bold: true });
 
       // ── Line 3 ──────────────────────────────────────────────────────────────
       // "Session…[session]……, Department of …[dept]……, Student of …[college]……,"
-      draw(student.session,    103, 268);
-      draw(student.department, 362, 268);
-      draw(student.college,    590, 268);
+      draw(student.session,    123, 271 , { size: 15, bold: true });
+      draw(student.department, 392, 271 , { size: 15, bold: true });
+      draw(student.college,    650, 271 , { size: 15, bold: true });
 
       // ── Line 4 ──────────────────────────────────────────────────────────────
       // "…[college]… has undergone Internship Training under the NAF 360 Exposure Program from"
@@ -105,10 +105,10 @@ router.post('/generate-certificate', async (req, res) => {
       // ── Line 5 ──────────────────────────────────────────────────────────────
       // "……[startDate] to ……[endDate] completing a total of ……[hours] hours,
       //  and awarded the Grade……[grade]……at"
-      draw(startDate,                   103, 212);
-      draw(endDate,                     213, 212);
-      draw(student.total_hours ?? '',   400, 212);
-      draw(student.grade ?? '',         600, 212);
+      draw(startDate,                   33, 200 , { size: 15, bold: true });
+      draw(endDate,                     138, 200, { size: 15, bold: true } );
+      draw(student.total_hours ?? '',   400, 200 ,  { size: 15, bold: true });
+      draw(student.grade ?? '',         700, 200, { size: 15, bold: true });
     }
 
     fillCertificate(648); // top certificate
@@ -189,8 +189,11 @@ router.post('/generate-attendance', async (req, res) => {
      * @param {number} xOff  Left X of the sheet box (0 or 648).
      */
     function fillAttendance(xOff) {
-      const draw = (text, relX, y, size = 9) =>
-        page.drawText(String(text ?? ''), { x: xOff + relX, y, size, font, color: rgb(0, 0, 0) });
+      const draw = (text, relX, y, size = 11, bold = true) => {
+        const options = { x: xOff + relX, y, size, font, color: rgb(0, 0, 0) };
+        if (bold) options.bold = true;
+        page.drawText(String(text ?? ''), options);
+      };
 
       // ── Header fields ────────────────────────────────────────────────────────
       draw(student.name,                185, 668);
