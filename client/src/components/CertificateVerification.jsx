@@ -56,7 +56,7 @@ const CertificateVerification = () => {
     }
     setLoading(true); setError("");
     try {
-      const res = await fetch('/api/generate-certificate', {
+      const res = await fetch('https://cert.nafsdc.com/api/generate-certificate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: form.name, regId: form.regId, dob: form.dob })
       });
@@ -76,7 +76,7 @@ const CertificateVerification = () => {
     if (!studentData) return;
     setCertLoading(true); setError("");
     try {
-      const res = await fetch('/api/generate-certificate', {
+      const res = await fetch('https://cert.nafsdc.com/api/generate-certificate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: studentData.name, regId: studentData.regId, dob: studentData.dob })
       });
@@ -98,7 +98,7 @@ const CertificateVerification = () => {
     if (!studentData) return;
     setAttendanceLoading(true); setError("");
     try {
-      const res = await fetch('/api/generate-attendance', {
+      const res = await fetch('https://cert.nafsdc.com/api/generate-attendance', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: studentData.name, regId: studentData.regId, dob: studentData.dob })
       });
