@@ -44,7 +44,6 @@ DROP TABLE IF EXISTS `students`;
 CREATE TABLE `students` (
   `id` int NOT NULL AUTO_INCREMENT,
   `name` varchar(100) NOT NULL,
-  `dob` date NOT NULL,
   `registration_number` varchar(50) NOT NULL,
   `roll_number` varchar(50) DEFAULT NULL,
   `father_name` varchar(100) DEFAULT NULL,
