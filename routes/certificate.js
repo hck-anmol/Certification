@@ -13,11 +13,11 @@ const formatDate = (dateString) => {
 };
 
 // Helper: query student by registration_number + dob
-const getStudentData = async (regId, dob) => {
+const getStudentData = async (regId) => {
   try {
     const [rows] = await pool.execute(
-      'SELECT * FROM students WHERE registration_number = ? AND dob = ?',
-      [regId, dob]
+      'SELECT * FROM students WHERE registration_number = ?',
+      [regId]
     );
     return rows.length > 0 ? rows[0] : null;
   } catch (error) {
@@ -37,13 +37,15 @@ const getStudentData = async (regId, dob) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/generate-certificate', async (req, res) => {
   try {
-    const { name, regId, dob } = req.body;
+    const { name, regId } = req.body;
 
-    if (!name || !regId || !dob) {
-      return res.status(400).json({ message: 'Name, Registration ID, and Date of Birth are required' });
+    if (!name || !regId) {
+      return res.status(400).json({
+        message: 'Name and Registration ID are required'
+      });
     }
 
-    const student = await getStudentData(regId, dob);
+    const student = await getStudentData(regId);
     if (!student) {
       return res.status(404).json({ message: 'Student not found. Please verify your credentials.' });
     }
@@ -148,18 +150,18 @@ router.post('/generate-certificate', async (req, res) => {
 
       // ── Line 1 ──────────────────────────────────────────────────────────────
       // "This is to certify that Mr / Miss ……… Son / Daughter of"
-      draw(student.name, 540, 335, { bold: true, size: 15 });
+      draw(student.name, 540, 349, { bold: true, size: 15 });
 
       // ── Line 2 ──────────────────────────────────────────────────────────────
       // "Shri/ Smt …[father]……, Reg.No…[reg]……, Roll No…[roll]……,"
-      draw(student.father_name, 190, 306, { size: 15, bold: true });
-      draw(student.registration_number, 450, 306, { size: 15, bold: true });
-      draw(student.roll_number, 714, 306, { size: 15, bold: true });
+      draw(student.father_name, 190, 320, { size: 15, bold: true });
+      draw(student.registration_number, 450, 320, { size: 15, bold: true });
+      draw(student.roll_number, 714, 320, { size: 15, bold: true });
 
       // ── Line 3 ──────────────────────────────────────────────────────────────
       // "Session…[session]……, Department of …[dept]……, Student of …[college]……,"
-      draw(student.session, 168, 271, { size: 15, bold: true });
-      draw(student.department, 467, 271, { size: 15, bold: true });
+      draw(student.session, 168, 285, { size: 15, bold: true });
+      draw(student.department, 467, 285, { size: 15, bold: true });
 
       const { part1, part2, continuation } = splitCollegeName(student.college);
       console.log('College split test:');
@@ -167,17 +169,17 @@ router.post('/generate-certificate', async (req, res) => {
       console.log('Part 2:', part2);
       console.log('Continuation:', continuation);
 
-      draw(part1, 730, 271, { size: 15, bold: true });
-      draw(part2, 131, 236, { size: 15, bold: true });
+      draw(part1, 730, 285, { size: 15, bold: true });
+      draw(part2, 131, 250, { size: 15, bold: true });
       draw(continuation, 103 + 20 * 2, 233, { size: 15, bold: true });
 
       // ── Line 5 ──────────────────────────────────────────────────────────────
       // "……[startDate] to ……[endDate] completing a total of ……[hours] hours,
       //  and awarded the Grade……[grade]…… at"
-      draw(startDate, 75, 200, { size: 15, bold: true });
-      draw(endDate, 175, 200, { size: 15, bold: true });
-      draw(student.total_hours ?? '', 400, 200, { size: 15, bold: true });
-      draw(student.grade ?? '', 710, 200, { size: 15, bold: true });
+      draw(startDate, 75, 214, { size: 15, bold: true });
+      draw(endDate, 175, 214, { size: 15, bold: true });
+      draw(student.total_hours ?? '', 400, 214, { size: 15, bold: true });
+      draw(student.grade ?? '', 710, 214, { size: 15, bold: true });
     }
 
     fillCertificate(648); // top certificate
@@ -192,6 +194,7 @@ router.post('/generate-certificate', async (req, res) => {
     res.status(500).json({ message: 'Server Error: Failed to generate certificate', error: err.message });
   }
 });
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ATTENDANCE SHEET GENERATION
@@ -221,13 +224,15 @@ router.post('/generate-certificate', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/generate-attendance', async (req, res) => {
   try {
-    const { name, regId, dob } = req.body;
+    const { name, regId } = req.body;
 
-    if (!name || !regId || !dob) {
-      return res.status(400).json({ message: 'Name, Registration ID, and Date of Birth are required' });
+    if (!name || !regId) {
+      return res.status(400).json({
+        message: 'Name and Registration ID are required'
+      });
     }
 
-    const student = await getStudentData(regId, dob);
+    const student = await getStudentData(regId);
     if (!student) {
       return res.status(404).json({ message: 'Student not found. Please verify your credentials.' });
     }
@@ -289,51 +294,56 @@ router.post('/generate-attendance', async (req, res) => {
       }
 
       // ── Header fields ────────────────────────────────────────────────────────
-      draw(student.name, 235, 677, 12, true);
+      draw(student.name, 235, 690, 12, true);
       const collegeShort = truncateWithEllipsis(student.college, 20);
-      draw(collegeShort, 488, 677, 10);
+      draw(collegeShort, 488, 690, 10);
 
-      draw(student.father_name, 235, 652, 12, true);
-      draw(student.department, 488, 652, 10);
-      draw(student.registration_number, 235, 627, 12, true);
-      draw(student.session, 488, 627, 10, true);
-      draw(student.roll_number, 235, 601);
-      draw(startDate, 488, 601);
-      draw(student.mobile_number ?? '', 235, 576);
-      draw(endDate, 488, 576);
+      draw(student.father_name, 235, 665, 12, true);
+      draw(student.department, 488, 665, 10);
+      draw(student.registration_number, 235, 640, 12, true);
+      draw(student.session, 488, 640, 10, true);
+      draw(student.roll_number, 235, 614);
+      draw(startDate, 488, 614);
+      draw(student.mobile_number ?? '', 235, 589);
+      draw(endDate, 488, 589);
 
       // ── Attendance table ─────────────────────────────────────────────────────
       const ROW_H = 26.8; // height per row in points
 
       // Days 1–15 (indices 0–14, left half of table)
-      const ROW_Y0_LEFT = 492;
+      const ROW_Y0_LEFT = 504;
       for (let i = 0; i < 14; i++) {          // FIX: was i < 14 (only 14 rows)
         const record = attendanceRows[i];
         if (!record) continue;
         const y = ROW_Y0_LEFT - i * ROW_H;
-        const isPresent = record.hours === 1;
+        const hours = Number(record.hours) || 0;
+        const isPresent = hours > 0;
 
-        draw(isPresent ? 'Present' : 'Absent', 198, y, 12);
-        draw(record.hours ?? 0, 279, y, 12);
+        draw(isPresent ? 'Present' : 'Absent', 203, y, 12);
+        draw(hours, 279, y, 12);
       }
 
       // Days 16–30 (indices 15–29, right half of table)
-      const ROW_Y0_RIGHT = 518.8;
-      for (let i = 0; i < 15; i++) {          // FIX: was i = 15..29 which made indexing awkward
+      const ROW_Y0_RIGHT = 530.8;
+      for (let i = 0; i <= 14; i++) {          // FIX: was i = 15..29 which made indexing awkward
         const record = attendanceRows[15 + i]; // index 15–29
         if (!record) continue;
         const y = ROW_Y0_RIGHT - i * ROW_H;
-        const isPresent = record.hours === 1;
+        const hours = Number(record.hours) || 0;
+        const isPresent = hours > 0;
 
-        draw(isPresent ? 'Present' : 'Absent', 430, y);
-        draw(record.hours ?? 0, 510, y);
+        draw(isPresent ? 'Present' : 'Absent', 437, y, 12);
+        draw(hours, 513, y, 12);
       }
 
       // ── Totals ───────────────────────────────────────────────────────────────
-      const totalDays = attendanceRows.filter(r => r.hours === 1).length;
-      const totalHours = attendanceRows.reduce((sum, r) => sum + (r.hours ?? 0), 0);
-      draw(totalDays, 218, 110);
-      draw(totalHours, 218, 89);
+      const totalDays = attendanceRows.filter(r => Number(r.hours) > 0).length;
+      const totalHours = attendanceRows.reduce(
+        (sum, r) => sum + (Number(r.hours) || 0),
+        0
+      );
+      draw(totalDays, 218, 122);
+      draw(totalHours, 218, 100);
     }
 
     fillAttendance(0);   // left sheet

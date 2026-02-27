@@ -32,7 +32,7 @@ const Field = ({ label, icon, type = "text", placeholder, value, onChange, requi
 };
 
 const CertificateVerification = () => {
-  const [form, setForm] = useState({ name: "", regId: "", dob: "" });
+  const [form, setForm] = useState({ name: "", regId: "" });
   const [loading, setLoading] = useState(false);
   const [certLoading, setCertLoading] = useState(false);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
@@ -51,21 +51,25 @@ const CertificateVerification = () => {
   };
 
   const handleVerify = async () => {
-    if (!form.name.trim() || !form.regId.trim() || !form.dob) {
-      setError("Please fill in all mandatory fields before proceeding."); return;
+    if (!form.name.trim() || !form.regId.trim()) {
+      setError("Please fill in all mandatory fields before proceeding.");
+      return;
     }
     setLoading(true); setError("");
     try {
       const res = await fetch('/api/generate-certificate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: form.name, regId: form.regId, dob: form.dob })
+        body: JSON.stringify({
+          name: form.name,
+          regId: form.regId
+        })
       });
       if (!res.ok) {
         const errorData = await res.json();
         setError(errorData.message || 'Verification failed. Please try again.');
         setLoading(false); return;
       }
-      setStudentData({ name: form.name, regId: form.regId, dob: form.dob });
+      setStudentData({ name: form.name, regId: form.regId });
       setLoading(false); setSuccess(true);
     } catch (err) {
       setError(err.message || 'An error occurred. Please try again.'); setLoading(false);
@@ -78,7 +82,10 @@ const CertificateVerification = () => {
     try {
       const res = await fetch('/api/generate-certificate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: studentData.name, regId: studentData.regId, dob: studentData.dob })
+        body: JSON.stringify({
+          name: form.name,
+          regId: form.regId
+        })
       });
       if (!res.ok) {
         const ct = res.headers.get('content-type');
@@ -100,7 +107,7 @@ const CertificateVerification = () => {
     try {
       const res = await fetch('/api/generate-attendance', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: studentData.name, regId: studentData.regId, dob: studentData.dob })
+        body: JSON.stringify({ name: form.name, regId: form.regId })
       });
       if (!res.ok) {
         const ct = res.headers.get('content-type');
@@ -219,7 +226,8 @@ const CertificateVerification = () => {
                     background: "#fafafa", border: "1px solid #ede8f0",
                     borderRadius: "8px", padding: "16px 20px", textAlign: "left", marginBottom: "24px"
                   }}>
-                    {[["Name", studentData?.name], ["Registration ID", studentData?.regId], ["Date of Birth", studentData?.dob]].map(([k, v]) => (
+                    {[["Name", studentData?.name],
+                    ["Registration ID", studentData?.regId]].map(([k, v]) => (
                       <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #f0eaf3" }}>
                         <span style={{ fontSize: "12px", color: "#8a7090", fontFamily: "sans-serif", fontWeight: "600", letterSpacing: "0.5px", textTransform: "uppercase" }}>{k}</span>
                         <span style={{ fontSize: "13.5px", color: "#1a1a2e", fontFamily: "sans-serif", fontWeight: "500" }}>{v}</span>
@@ -268,7 +276,7 @@ const CertificateVerification = () => {
                   </div>
 
                   <button
-                    onClick={() => { setSuccess(false); setForm({ name: "", regId: "", dob: "" }); setStudentData(null); setError(""); }}
+                    onClick={() => { setSuccess(false); setForm({ name: "", regId: "" }); setStudentData(null); setError(""); }}
                     style={{
                       padding: "10px 22px", background: "white", color: "#6b7280",
                       border: "1.5px solid #e2e8f0", borderRadius: "7px",
@@ -295,7 +303,6 @@ const CertificateVerification = () => {
 
                   <Field label="Full Name" icon="" type="text" placeholder="Enter your full name as per registration" value={form.name} onChange={set("name")} required />
                   <Field label="Registration ID" icon="" type="text" placeholder="Enter your internship registration number" value={form.regId} onChange={set("regId")} required />
-                  <Field label="Date of Birth" icon="" type="date" value={form.dob} onChange={set("dob")} required />
 
                   {error && (
                     <div style={{
@@ -326,7 +333,10 @@ const CertificateVerification = () => {
                     <div style={{ fontWeight: "700", color: "#4a5568", marginBottom: "10px", fontSize: "12px", letterSpacing: "0.6px", textTransform: "uppercase", fontFamily: "sans-serif" }}>
                       What You Will Need
                     </div>
-                    {["Full name as registered in the portal", "Your unique Internship Registration ID", "Date of birth for identity confirmation"].map((item, i) => (
+                    {[
+                      "Full name as registered in the portal",
+                      "Your unique Internship Registration ID"
+                    ].map((item, i) => (
                       <div key={i} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
                         <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#c0185a", flexShrink: 0 }} />
                         <span style={{ fontSize: "13px", color: "#6b7280", fontFamily: "sans-serif" }}>{item}</span>
