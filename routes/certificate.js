@@ -146,7 +146,7 @@ router.post('/generate-certificate', async (req, res) => {
 
       // ── Certificate number ────────────────────────────────────────────────
       // "Certificate No.:……"
-      draw(student.certificate_number || '', 158, 380, { size: 15, bold: true });
+      draw(student.certificate_number || '', 158, 395, { size: 15, bold: true });
 
       // ── Line 1 ──────────────────────────────────────────────────────────────
       // "This is to certify that Mr / Miss ……… Son / Daughter of"
