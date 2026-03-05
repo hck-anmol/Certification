@@ -31,7 +31,6 @@ const getStudentData = async (regId) => {
 // Template: 864 × 1296 pt (portrait), two identical certificates stacked.
 //   Top cert:    y = 648 – 1296  → baseY = 648
 //   Bottom cert: y = 0   – 648   → baseY = 0
-//
 // All Y coordinates below are RELATIVE to baseY (i.e. distance from the
 // bottom of each certificate box). pdf-lib origin is bottom-left.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -83,7 +82,7 @@ router.post('/generate-certificate', async (req, res) => {
        * @param {boolean} [opts.bold=false]        Use bold font.
        * @param {Color}   [opts.color=rgb(0,0,0)] Text colour.
        */
-      function draw(text, centerX, relY, { size = 12, bold = false, color = rgb(0, 0, 0) } = {}) {
+      function draw(text, centerX, relY, { size = 11 , bold = false, color = rgb(0, 0, 0) } = {}) {
         const safeText = String(text ?? '');
         const activeFont = bold ? boldFont : font;
         const textWidth = activeFont.widthOfTextAtSize(safeText, size);
